@@ -58,6 +58,15 @@ REM Build APK
 echo [INFO] Starting APK build...
 echo [WARNING] This may take 30-60 minutes...
 echo.
+
+REM Default: clean cache unless explicitly disabled
+if not defined CLEAN_CACHE set CLEAN_CACHE=1
+
+if "%CLEAN_CACHE%"=="1" goto :CLEAN_CACHE_BLOCK
+echo [INFO] Skipping cache clean (set CLEAN_CACHE=1 to enable)
+goto :AFTER_CLEAN
+
+:CLEAN_CACHE_BLOCK
 echo [INFO] Cleaning Pillow recipe cache (to avoid patch mismatch)...
 docker run --rm ^
     -v "%cd%":/app:Z ^
@@ -79,6 +88,16 @@ docker run --rm ^
     -w /app ^
     buildozer-app ^
     sh -c "rm -rf /app/.buildozer/android/platform/python-for-android /root/.buildozer/android/platform/python-for-android 2>/dev/null || true"
+echo [INFO] Full clean .buildozer (host + container) for fresh recipes...
+docker run --rm ^
+    -v "%cd%":/app:Z ^
+    -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
+    -w /app ^
+    buildozer-app ^
+    sh -c "rm -rf /app/.buildozer /root/.buildozer 2>/dev/null || true"
+goto :AFTER_CLEAN
+
+:AFTER_CLEAN
 
 docker run --rm -it ^
     -v "%cd%":/app:Z ^
