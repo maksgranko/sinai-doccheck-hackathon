@@ -1,0 +1,57 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+ENV PYTHONIOENCODING=utf-8
+ENV BUILDozer_ALLOW_ROOT=1
+
+# Установка системных зависимостей
+RUN apt-get update && \
+    apt-get install -y \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    git \
+    unzip \
+    openjdk-17-jdk \
+    build-essential \
+    ccache \
+    libffi-dev \
+    libssl-dev \
+    cython3 \
+    coreutils \
+    cmake \
+    pkg-config \
+    autoconf \
+    automake \
+    libtool \
+    autotools-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка Python зависимостей
+RUN pip3 install --no-cache-dir \
+    Cython==0.29.33 \
+    setuptools \
+    wheel && \
+    pip3 install --no-cache-dir buildozer
+
+WORKDIR /app
+
+# Установка переменных окружения для стабильности
+ENV TMPDIR=/tmp
+ENV PYTHONUNBUFFERED=1
+
+# Создание entrypoint скрипта с множественными ответами
+RUN echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export LC_ALL=C.UTF-8' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export LANG=C.UTF-8' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export PYTHONIOENCODING=utf-8' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export BUILDozer_ALLOW_ROOT=1' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export TMPDIR=/tmp' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export PYTHONUNBUFFERED=1' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'yes | "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["buildozer", "android", "debug"]

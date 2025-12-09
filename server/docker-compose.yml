@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: document-verifier-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://dbuser:password@db:5432/document_verifier
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./app:/app
+      - ./logs:/var/log/document-verifier
+    restart: unless-stopped
+
+  db:
+    image: postgres:14-alpine
+    container_name: document-verifier-db
+    environment:
+      - POSTGRES_DB=document_verifier
+      - POSTGRES_USER=dbuser
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: document-verifier-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: document-verifier-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
