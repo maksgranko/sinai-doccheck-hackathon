@@ -14,26 +14,39 @@ router = APIRouter()
 
 
 @router.post("/verify", response_model=DocumentResponse)
+@router.get("/verify", response_model=DocumentResponse)
 async def verify_document(
-    request: DocumentVerifyRequest,
+    request: Optional[DocumentVerifyRequest] = None,
+    document_id: Optional[str] = None,  # Для GET запросов
     pin_code: Optional[str] = Header(None, alias="X-PIN-Code"),
     db: Session = Depends(get_db)
 ):
     """
     Верификация документа по ID
     
+    Поддерживает как POST (с JSON телом), так и GET (с query параметром document_id)
+    
     - **document_id**: ID документа из QR-кода
     - **X-PIN-Code**: PIN-код для аутентификации (опционально)
     """
+    # Определяем document_id из запроса
+    doc_id = document_id or (request.document_id if request else None)
+    
+    if not doc_id:
+        raise HTTPException(
+            status_code=400,
+            detail="document_id обязателен"
+        )
+    
     # Поиск документа в БД
     document = db.query(Document).filter(
-        Document.document_id == request.document_id
+        Document.document_id == doc_id
     ).first()
     
     if not document:
         # Документ не найден
         return DocumentErrorResponse(
-            document_id=request.document_id,
+            document_id=doc_id,
             error="Документ не найден в реестре"
         )
     
@@ -59,5 +72,6 @@ async def verify_document(
         expiry_date=document.expiry_date,
         metadata=document.metadata or {}
     )
+
 
 

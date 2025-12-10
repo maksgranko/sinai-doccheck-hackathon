@@ -7,7 +7,7 @@ Create Date: 2024-01-01 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+# Для MySQL используем стандартные типы SQLAlchemy
 
 # revision identifiers, used by Alembic.
 revision = '001'
@@ -27,9 +27,9 @@ def upgrade() -> None:
         sa.Column('issue_date', sa.Date(), nullable=True),
         sa.Column('expiry_date', sa.Date(), nullable=True),
         sa.Column('status', sa.String(length=20), nullable=False),
-        sa.Column('metadata', postgresql.JSON(astext_type=sa.Text()), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('metadata', sa.JSON(), nullable=True),  # MySQL поддерживает JSON
+        sa.Column('created_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=True),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('document_id')
     )
@@ -46,9 +46,9 @@ def upgrade() -> None:
         sa.Column('document_id', sa.String(length=255), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=True),
         sa.Column('status', sa.String(length=20), nullable=False),
-        sa.Column('ip_address', postgresql.INET(), nullable=True),
+        sa.Column('ip_address', sa.String(length=45), nullable=True),  # IPv6 может быть до 45 символов
         sa.Column('user_agent', sa.Text(), nullable=True),
-        sa.Column('verified_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('verified_at', sa.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.ForeignKeyConstraint(['document_id'], ['documents.document_id'], ),
         sa.PrimaryKeyConstraint('id')
     )
@@ -65,5 +65,6 @@ def downgrade() -> None:
     op.drop_index('idx_status', table_name='documents')
     op.drop_index('idx_document_id', table_name='documents')
     op.drop_table('documents')
+
 
 

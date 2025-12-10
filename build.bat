@@ -37,80 +37,58 @@ if not exist "Dockerfile.buildozer" (
 echo [OK] Dockerfile.buildozer found
 echo.
 
-REM Build Docker image (only if absent)
-echo [INFO] Checking buildozer-app image...
-docker image inspect buildozer-app >nul 2>&1
+REM Build Docker image
+echo [INFO] Building Docker image...
+echo [INFO] This may take 5-10 minutes on first run...
+echo.
+docker build -f Dockerfile.buildozer -t buildozer-app .
 if errorlevel 1 (
-    echo [INFO] Image not found, building...
-    echo [INFO] This may take 5-10 minutes on first run...
-    docker build -f Dockerfile.buildozer -t buildozer-app .
-    if errorlevel 1 (
-        echo [ERROR] Docker build failed!
-        pause
-        exit /b 1
+    echo [ERROR] Docker build failed!
+    pause
+    exit /b 1
+)
+echo [OK] Docker image ready
+echo.
+
+REM Clean cache (optional)
+echo [INFO] Clean build cache?
+echo [INFO] Keeping cache will make subsequent builds faster
+set /p clean_cache="Clean cache? (Y/N, default=N): "
+if /i "%clean_cache%"=="Y" (
+    echo [INFO] Cleaning cache...
+    if exist ".buildozer" (
+        rmdir /s /q ".buildozer" 2>nul
+        timeout /t 2 >nul
     )
+    echo [INFO] Removing problematic build caches...
+    docker run --rm -v "%cd%":/app:Z -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z buildozer-app sh -c "rm -rf /app/.buildozer /root/.buildozer/android/platform/build-*/build/other_builds/Pillow 2>/dev/null; echo 'Cache cleaned'"
+    echo [OK] Cache cleaned
 ) else (
-    echo [OK] Reusing existing buildozer-app image
+    echo [INFO] Keeping cache for faster builds
 )
 echo.
 
 REM Build APK
 echo [INFO] Starting APK build...
-echo [WARNING] This may take 30-60 minutes...
+echo [INFO] Using ccache for faster compilation...
+echo [WARNING] First build may take 30-60 minutes...
+echo [INFO] Subsequent builds will be much faster thanks to ccache
 echo.
-
-REM Default: clean cache unless explicitly disabled
-if not defined CLEAN_CACHE set CLEAN_CACHE=1
-
-if "%CLEAN_CACHE%"=="1" goto :CLEAN_CACHE_BLOCK
-echo [INFO] Skipping cache clean (set CLEAN_CACHE=1 to enable)
-goto :AFTER_CLEAN
-
-:CLEAN_CACHE_BLOCK
-echo [INFO] Cleaning Pillow recipe cache (to avoid patch mismatch)...
-docker run --rm ^
-    -v "%cd%":/app:Z ^
-    -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
-    -w /app ^
-    buildozer-app ^
-    sh -c "rm -rf /app/.buildozer/android/platform/build-*/build/other_builds/Pillow /root/.buildozer/android/platform/build-*/build/other_builds/Pillow 2>/dev/null || true"
-echo [INFO] Cleaning dist cache (to refresh requirements)...
-docker run --rm ^
-    -v "%cd%":/app:Z ^
-    -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
-    -w /app ^
-    buildozer-app ^
-    sh -c "rm -rf /app/.buildozer/android/platform/build-*/dists/documentverifier /root/.buildozer/android/platform/build-*/dists/documentverifier 2>/dev/null || true"
-echo [INFO] Cleaning p4a repo (to avoid broken git remote)...
-docker run --rm ^
-    -v "%cd%":/app:Z ^
-    -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
-    -w /app ^
-    buildozer-app ^
-    sh -c "rm -rf /app/.buildozer/android/platform/python-for-android /root/.buildozer/android/platform/python-for-android 2>/dev/null || true"
-echo [INFO] Full clean .buildozer (host + container) for fresh recipes...
-docker run --rm ^
-    -v "%cd%":/app:Z ^
-    -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
-    -w /app ^
-    buildozer-app ^
-    sh -c "rm -rf /app/.buildozer /root/.buildozer 2>/dev/null || true"
-goto :AFTER_CLEAN
-
-:AFTER_CLEAN
-
 docker run --rm -it ^
     -v "%cd%":/app:Z ^
     -v "%USERPROFILE%\.buildozer":/root/.buildozer:Z ^
-    -v "%USERPROFILE%\.gradle":/root/.gradle:Z ^
+    -v "%USERPROFILE%\.ccache":/root/.ccache:Z ^
     -w /app ^
     -e BUILDozer_ALLOW_ROOT=1 ^
     -e LC_ALL=C.UTF-8 ^
     -e LANG=C.UTF-8 ^
     -e PYTHONUNBUFFERED=1 ^
-    -e GRADLE_USER_HOME=/root/.gradle ^
+    -e USE_CCACHE=1 ^
+    -e CCACHE_DIR=/root/.ccache ^
+    -e CCACHE_MAXSIZE=5G ^
+    -e NUM_BUILD_CORES=4 ^
     buildozer-app ^
-    sh -c "yes | buildozer android debug"
+    sh -c "chmod +x /app/buildozer_wrapper.sh && yes | /app/buildozer_wrapper.sh android debug"
 
 if errorlevel 1 (
     echo.

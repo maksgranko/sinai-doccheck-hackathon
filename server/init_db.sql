@@ -55,3 +55,4 @@ COMMENT ON COLUMN documents.status IS 'Статус: valid, warning, invalid, re
 COMMENT ON COLUMN verifications.status IS 'Результат верификации: valid, warning, invalid';
 
 
+

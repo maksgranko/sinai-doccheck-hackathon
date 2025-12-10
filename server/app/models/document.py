@@ -18,13 +18,14 @@ class Document(Base):
     expiry_date = Column(Date, index=True)
     status = Column(String(20), nullable=False, index=True)  # valid, warning, invalid, revoked
     metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())  # MySQL TIMESTAMP
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())  # MySQL TIMESTAMP
     
     __table_args__ = (
         Index('idx_document_id', 'document_id'),
         Index('idx_status', 'status'),
         Index('idx_expiry_date', 'expiry_date'),
     )
+
 
 

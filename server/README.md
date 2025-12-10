@@ -50,3 +50,4 @@ docker-compose up -d
 См. `TECH_STACK.md` раздел "Развертывание сервера".
 
 
+

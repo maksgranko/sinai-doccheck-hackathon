@@ -20,6 +20,8 @@ class ScannerViewModel:
         self.current_document: Optional[DocumentModel] = None
         self.on_status_changed: Optional[Callable] = None
         self.on_error: Optional[Callable] = None
+        self.on_loading: Optional[Callable] = None  # Callback для индикатора загрузки
+        self.is_verifying = False
     
     def verify_document(self, document_id: str, pin_code: Optional[str] = None):
         """
@@ -27,9 +29,36 @@ class ScannerViewModel:
         
         Args:
             document_id: ID документа из QR-кода
-            pin_code: PIN-код для аутентификации
+            pin_code: PIN-код для аутентификации (если None, будет получен из хранилища)
         """
+        # Валидация ввода
+        document_id = document_id.strip() if document_id else ""
+        if not document_id:
+            if self.on_error:
+                self.on_error("Введите ID документа")
+            return
+        
+        if len(document_id) < 3:
+            if self.on_error:
+                self.on_error("ID документа слишком короткий")
+            return
+        
+        if self.is_verifying:
+            Logger.warning("ViewModel: Верификация уже выполняется")
+            return
+        
         Logger.info(f"ViewModel: Начало верификации документа {document_id}")
+        self.is_verifying = True
+        
+        # Показываем индикатор загрузки
+        if self.on_loading:
+            self.on_loading(True)
+        
+        # Если PIN не передан, пытаемся получить из хранилища
+        if pin_code is None:
+            from security.pin_storage import PinStorage
+            pin_storage = PinStorage()
+            pin_code = pin_storage.get_pin()
         
         # Запуск верификации в отдельном потоке (симуляция через Clock)
         Clock.schedule_once(
@@ -43,10 +72,23 @@ class ScannerViewModel:
             # Запрос к серверу
             document = self.repository.verify_document(document_id, pin_code)
             
+            # Скрываем индикатор загрузки
+            if self.on_loading:
+                self.on_loading(False)
+            self.is_verifying = False
+            
             if document:
                 self.current_document = document
-                
-                # Сохранение в журнал
+
+                # Если сервер вернул ошибку — считаем, что это не документ, не пишем в историю
+                if document.metadata and isinstance(document.metadata, dict) and document.metadata.get('error'):
+                    err_msg = document.metadata.get('error')
+                    if self.on_error:
+                        self.on_error(err_msg)
+                    Logger.warning(f"ViewModel: Ошибка ответа API: {err_msg}")
+                    return
+
+                # Сохранение в журнал только для валидных ответов без ошибки
                 record = VerificationRecord(
                     document_id=document.document_id,
                     status=document.status,
@@ -61,12 +103,31 @@ class ScannerViewModel:
                 
                 Logger.info(f"ViewModel: Верификация завершена, статус: {document.status}")
             else:
-                error_msg = "Не удалось получить ответ от сервера"
+                error_msg = "Не удалось получить ответ от сервера. Проверьте подключение к интернету."
                 if self.on_error:
                     self.on_error(error_msg)
                 Logger.error(f"ViewModel: {error_msg}")
         
+        except ConnectionError as e:
+            self.is_verifying = False
+            if self.on_loading:
+                self.on_loading(False)
+            error_msg = "Ошибка подключения к серверу. Проверьте интернет-соединение."
+            if self.on_error:
+                self.on_error(error_msg)
+            Logger.error(f"ViewModel: {error_msg}")
+        except TimeoutError as e:
+            self.is_verifying = False
+            if self.on_loading:
+                self.on_loading(False)
+            error_msg = "Превышено время ожидания ответа. Попробуйте еще раз."
+            if self.on_error:
+                self.on_error(error_msg)
+            Logger.error(f"ViewModel: {error_msg}")
         except Exception as e:
+            self.is_verifying = False
+            if self.on_loading:
+                self.on_loading(False)
             error_msg = f"Ошибка верификации: {str(e)}"
             if self.on_error:
                 self.on_error(error_msg)

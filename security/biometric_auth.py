@@ -1,9 +1,22 @@
 """
 Модуль биометрической аутентификации
 """
-from plyer import biometric
+import platform
 from kivy.logger import Logger
 from typing import Optional, Callable
+
+# Попытка импорта биометрии из plyer
+try:
+    from plyer import biometric
+    BIOMETRIC_AVAILABLE = True
+except (ImportError, AttributeError):
+    # Биометрия недоступна на Windows или не установлена
+    biometric = None
+    BIOMETRIC_AVAILABLE = False
+    if platform.system() == 'Windows':
+        Logger.info("BiometricAuth: Биометрия недоступна на Windows (только Android/iOS)")
+    else:
+        Logger.warning("BiometricAuth: Модуль biometric недоступен в plyer")
 
 
 class BiometricAuth:
@@ -20,6 +33,13 @@ class BiometricAuth:
         Returns:
             True если доступна
         """
+        if not BIOMETRIC_AVAILABLE or biometric is None:
+            return False
+        
+        if platform.system() == 'Windows':
+            # Биометрия не поддерживается на Windows через plyer
+            return False
+        
         try:
             return biometric.is_available()
         except Exception as e:
@@ -41,7 +61,7 @@ class BiometricAuth:
         Returns:
             True если аутентификация успешна
         """
-        if not self.is_available:
+        if not self.is_available or biometric is None:
             Logger.warning("BiometricAuth: Биометрия недоступна")
             if callback:
                 callback(False)

@@ -12,7 +12,9 @@ engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     pool_size=10,
-    max_overflow=20
+    max_overflow=20,
+    pool_recycle=3600,  # Переподключение каждые 3600 секунд (для MySQL)
+    echo=False  # Установите True для отладки SQL запросов
 )
 
 # Сессия БД
@@ -29,5 +31,6 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 

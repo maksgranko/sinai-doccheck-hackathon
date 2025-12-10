@@ -10,6 +10,9 @@ from view.scanner_screen import ScannerScreen
 from view.history_screen import HistoryScreen
 from view.settings_screen import SettingsScreen
 from view.login_screen import LoginScreen
+from view.statistics_screen import StatisticsScreen
+from view.document_detail_screen import DocumentDetailScreen
+from view.search_screen import SearchScreen
 
 
 class DocumentVerifierApp(App):
@@ -17,10 +20,26 @@ class DocumentVerifierApp(App):
     
     def build(self):
         """Создание интерфейса приложения"""
+        self.title = "DocCheck"
         Logger.info("App: Инициализация приложения")
         
         # Настройка размера окна для мобильных устройств
-        Window.size = (360, 640)
+        # Автоматическое определение размера экрана
+        from kivy.core.window import Window
+        if Window.width < 400:  # Мобильное устройство
+            Window.size = (360, 640)
+        else:  # Десктоп
+            Window.size = (400, 700)
+        
+        # Установка цвета фона приложения (современная тема)
+        try:
+            from design.modern_theme import BACKGROUND_COLOR
+        except ImportError:
+            from design.theme import BACKGROUND_COLOR
+        Window.clearcolor = BACKGROUND_COLOR
+        
+        # Включение адаптивного масштабирования
+        Window.bind(on_resize=self.on_window_resize)
         
         # Создание менеджера экранов
         sm = ScreenManager()
@@ -30,6 +49,9 @@ class DocumentVerifierApp(App):
         sm.add_widget(ScannerScreen(name='scanner'))
         sm.add_widget(HistoryScreen(name='history'))
         sm.add_widget(SettingsScreen(name='settings'))
+        sm.add_widget(StatisticsScreen(name='statistics'))
+        sm.add_widget(DocumentDetailScreen(name='document_detail'))
+        sm.add_widget(SearchScreen(name='search'))
         
         # Установка начального экрана
         sm.current = 'login'
@@ -43,6 +65,10 @@ class DocumentVerifierApp(App):
     def on_stop(self):
         """Вызывается при закрытии приложения"""
         Logger.info("App: Приложение закрыто")
+    
+    def on_window_resize(self, window, width, height):
+        """Обработка изменения размера окна"""
+        Logger.info(f"App: Размер окна изменен: {width}x{height}")
 
 
 if __name__ == '__main__':

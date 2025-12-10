@@ -8,13 +8,13 @@ from typing import List
 class Settings(BaseSettings):
     """Настройки приложения"""
     
-    # База данных
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/document_verifier"
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_NAME: str = "document_verifier"
-    DB_USER: str = "dbuser"
-    DB_PASSWORD: str = "password"
+    # База данных MySQL (удаленная БД на сервере)
+    DATABASE_URL: str = "mysql+pymysql://sinai_hackat:^R6E=>k[\\OVxT?l*@195.209.210.97:3306/sinai_hackat?charset=utf8mb4"
+    DB_HOST: str = "195.209.210.97"
+    DB_PORT: int = 3306
+    DB_NAME: str = "sinai_hackat"
+    DB_USER: str = "sinai_hackat"
+    DB_PASSWORD: str = "^R6E=>k[\\OVxT?l*"
     
     # API
     API_HOST: str = "0.0.0.0"
@@ -44,5 +44,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 
 

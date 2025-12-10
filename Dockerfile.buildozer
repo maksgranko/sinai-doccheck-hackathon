@@ -6,7 +6,14 @@ ENV LANG=C.UTF-8
 ENV PYTHONIOENCODING=utf-8
 ENV BUILDozer_ALLOW_ROOT=1
 
-# Установка системных зависимостей
+# Переменные для ускорения сборки
+ENV USE_CCACHE=1
+ENV CCACHE_DIR=/root/.ccache
+ENV CCACHE_MAXSIZE=5G
+ENV ANDROID_NDK_HOME=/root/.buildozer/android/platform/android-ndk-r25b
+ENV ANDROID_HOME=/root/.buildozer/android/platform/android-sdk
+
+# Установка ВСЕХ системных зависимостей заранее
 RUN apt-get update && \
     apt-get install -y \
     python3-pip \
@@ -14,6 +21,8 @@ RUN apt-get update && \
     python3-dev \
     git \
     unzip \
+    wget \
+    curl \
     openjdk-17-jdk \
     build-essential \
     ccache \
@@ -22,36 +31,110 @@ RUN apt-get update && \
     cython3 \
     coreutils \
     cmake \
+    ninja-build \
     pkg-config \
     autoconf \
     automake \
     libtool \
     autotools-dev \
+    gettext \
+    libgettextpo-dev \
+    libjpeg-dev \
+    libpng-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libwebp-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    libxcb1-dev \
+    libx11-dev \
+    libxext-dev \
+    libxrender-dev \
+    libxrandr-dev \
+    libxi-dev \
+    libxcursor-dev \
+    perl \
+    nasm \
+    && \
+    # Создаем симлинк для openssl/configuration.h если его нет
+    (test -f /usr/include/openssl/configuration.h || \
+     (test -f /usr/include/openssl/opensslconf.h && \
+      ln -sf opensslconf.h /usr/include/openssl/configuration.h || true)) \
     && rm -rf /var/lib/apt/lists/*
 
-# Установка Python зависимостей
+# Настройка ccache
+RUN mkdir -p /root/.ccache && \
+    ccache -M 5G
+
+# Установка Rust (нужно для cryptography)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN /root/.cargo/bin/rustc --version && /root/.cargo/bin/cargo --version
+
+# КРИТИЧНО: Проверяем наличие opensslconf.h и создаем символическую ссылку если нужно
+# В Ubuntu 22.04 opensslconf.h может находиться в /usr/include/x86_64-linux-gnu/openssl/
+RUN if [ ! -f /usr/include/openssl/opensslconf.h ]; then \
+        if [ -f /usr/include/x86_64-linux-gnu/openssl/opensslconf.h ]; then \
+            mkdir -p /usr/include/openssl && \
+            ln -sf /usr/include/x86_64-linux-gnu/openssl/opensslconf.h /usr/include/openssl/opensslconf.h && \
+            echo "Created symlink for opensslconf.h"; \
+        else \
+            echo "WARNING: opensslconf.h not found in standard locations"; \
+            find /usr -name "opensslconf.h" 2>/dev/null | head -1 || true; \
+        fi; \
+    else \
+        echo "opensslconf.h found at /usr/include/openssl/opensslconf.h"; \
+    fi
+
+# КРИТИЧНО: Создаем симлинк для openssl/configuration.h если его нет
+# openssl-sys 0.9.96 требует configuration.h, но в старых версиях OpenSSL его может не быть
+RUN if [ ! -f /usr/include/openssl/configuration.h ]; then \
+        if [ -f /usr/include/openssl/opensslconf.h ]; then \
+            ln -sf opensslconf.h /usr/include/openssl/configuration.h && \
+            echo "Created symlink: configuration.h -> opensslconf.h"; \
+        elif [ -f /usr/include/x86_64-linux-gnu/openssl/opensslconf.h ]; then \
+            mkdir -p /usr/include/openssl && \
+            ln -sf /usr/include/x86_64-linux-gnu/openssl/opensslconf.h /usr/include/openssl/configuration.h && \
+            echo "Created symlink: configuration.h -> x86_64-linux-gnu/openssl/opensslconf.h"; \
+        else \
+            echo "WARNING: Could not create configuration.h symlink"; \
+        fi; \
+    else \
+        echo "configuration.h found at /usr/include/openssl/configuration.h"; \
+    fi
+
+# Установка Python зависимостей для сборки
 RUN pip3 install --no-cache-dir \
     Cython==0.29.33 \
-    setuptools \
-    wheel && \
-    pip3 install --no-cache-dir buildozer
+    setuptools>=65.0.0 \
+    wheel \
+    setuptools_rust>=1.5.0 \
+    cffi \
+    buildozer \
+    && pip3 install --upgrade pip
 
 WORKDIR /app
 
-# Установка переменных окружения для стабильности
-ENV TMPDIR=/tmp
-ENV PYTHONUNBUFFERED=1
-
-# Создание entrypoint скрипта с множественными ответами
+# Создание entrypoint скрипта
 RUN echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'export LC_ALL=C.UTF-8' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'export LANG=C.UTF-8' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'export PYTHONIOENCODING=utf-8' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'export BUILDozer_ALLOW_ROOT=1' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'export TMPDIR=/tmp' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'export PYTHONUNBUFFERED=1' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export USE_CCACHE=1' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export CCACHE_DIR=/root/.ccache' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export CCACHE_MAXSIZE=5G' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export NUM_BUILD_CORES=4' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'export PATH="/root/.cargo/bin:$PATH"' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'yes | "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
     chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Копируем только необходимые скрипты
+COPY buildozer_wrapper.sh /app/buildozer_wrapper.sh
+COPY patch_crypto_in_docker.sh /app/patch_crypto_in_docker.sh
+RUN chmod +x /app/buildozer_wrapper.sh && \
+    chmod +x /app/patch_crypto_in_docker.sh
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["buildozer", "android", "debug"]
+CMD ["/app/buildozer_wrapper.sh", "android", "debug"]

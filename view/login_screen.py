@@ -11,6 +11,17 @@ from kivy.metrics import dp
 
 from security.biometric_auth import BiometricAuth
 from security.pin_storage import PinStorage
+try:
+    from design.modern_theme import (
+        PRIMARY_COLOR, SURFACE_COLOR, BACKGROUND_COLOR, BORDER_RADIUS,
+        INPUT_HEIGHT, BUTTON_HEIGHT, CARD_PADDING, CARD_SPACING, TEXT_PRIMARY
+    )
+except ImportError:
+    from design.theme import (
+        PRIMARY_COLOR, SURFACE_COLOR, BACKGROUND_COLOR, BORDER_RADIUS,
+        INPUT_HEIGHT, BUTTON_HEIGHT, CARD_PADDING, CARD_SPACING, TEXT_PRIMARY
+    )
+from design.components import PrimaryButton, SecondaryButton, StyledTextInput, TitleLabel, SubtitleLabel, BodyLabel, CaptionLabel, Card
 
 
 class LoginScreen(Screen):
@@ -25,78 +36,134 @@ class LoginScreen(Screen):
     
     def build_ui(self):
         """Построение интерфейса"""
-        layout = BoxLayout(
+        # Адаптивные размеры
+        from kivy.core.window import Window
+        is_mobile = Window.width < 400 or Window.height < 600
+        
+        padding_h = dp(20) if is_mobile else dp(32)
+        padding_v = dp(24) if is_mobile else dp(40)
+        
+        # Основной контейнер
+        main_container = BoxLayout(
             orientation='vertical',
-            padding=dp(20),
+            padding=[padding_h, padding_v],
             spacing=dp(20),
             pos_hint={'center_x': 0.5, 'center_y': 0.5}
         )
         
-        # Заголовок
-        title = Label(
-            text='Верификатор документов',
-            size_hint_y=None,
-            height=dp(60),
-            font_size=dp(24),
-            bold=True
+        # Контейнер для карточки входа
+        card_height = dp(420) if is_mobile else dp(450)
+        card_container = Card(
+            size_hint=(0.92, None),
+            height=card_height,
+            pos_hint={'center_x': 0.5}
         )
-        layout.add_widget(title)
         
-        subtitle = Label(
-            text='Проверка подлинности электронных документов',
+        # Внутренний контейнер карточки (уже есть padding в Card)
+        card_content = BoxLayout(
+            orientation='vertical',
+            spacing=dp(20)
+        )
+        
+        # Логотип/иконка - простой и элегантный
+        icon_container = BoxLayout(
             size_hint_y=None,
-            height=dp(40),
+            height=dp(75),
+            pos_hint={'center_x': 0.5}
+        )
+        icon_label = BodyLabel(
+            text='DOC',
+            font_size=dp(42),
+            halign='center',
+            bold=True,
+            color=PRIMARY_COLOR
+        )
+        icon_container.add_widget(icon_label)
+        
+        # Заголовок - адаптивный размер для мобильных устройств
+        title_font_size = dp(20) if is_mobile else dp(24)
+        title = TitleLabel(
+            text='Верификатор\nдокументов' if is_mobile else 'Верификатор документов',
+            size_hint_y=None,
+            height=dp(50) if is_mobile else dp(58),
+            halign='center',
+            font_size=title_font_size,
+            text_size=(None, None)  # Разрешаем перенос строк
+        )
+        title.bind(texture_size=title.setter('size'))
+        
+        subtitle_font_size = dp(13) if is_mobile else dp(15)
+        subtitle = SubtitleLabel(
+            text='Проверка подлинности\nэлектронных документов' if is_mobile else 'Проверка подлинности электронных документов',
+            size_hint_y=None,
+            height=dp(38) if is_mobile else dp(42),
+            halign='center',
+            font_size=subtitle_font_size,
+            text_size=(None, None)  # Разрешаем перенос строк
+        )
+        subtitle.bind(texture_size=subtitle.setter('size'))
+        
+        # Поле для PIN-кода
+        pin_label = BodyLabel(
+            text='PIN-код (опционально)',
+            size_hint_y=None,
+            height=dp(26),
+            halign='left',
             font_size=dp(14)
         )
-        layout.add_widget(subtitle)
         
-        # Поле для PIN-кода (опционально)
-        pin_label = Label(
-            text='PIN-код (опционально):',
-            size_hint_y=None,
-            height=dp(30),
-            font_size=dp(12)
-        )
-        layout.add_widget(pin_label)
-        
-        self.pin_input = TextInput(
+        self.pin_input = StyledTextInput(
             password=True,
-            multiline=False,
+            hint_text='Введите PIN-код',
             size_hint_y=None,
-            height=dp(40),
-            font_size=dp(16)
+            height=INPUT_HEIGHT
         )
-        layout.add_widget(self.pin_input)
         
         # Кнопка входа
-        login_button = Button(
+        login_button = PrimaryButton(
             text='Войти',
             size_hint_y=None,
-            height=dp(50),
+            height=BUTTON_HEIGHT,
             on_press=self.login
         )
-        layout.add_widget(login_button)
         
         # Кнопка биометрической аутентификации
+        bio_button = None
         if self.biometric_auth.is_available:
-            bio_button = Button(
+            bio_button = SecondaryButton(
                 text='Войти с биометрией',
                 size_hint_y=None,
-                height=dp(50),
+                height=BUTTON_HEIGHT,
                 on_press=self.login_with_biometric
             )
-            layout.add_widget(bio_button)
         
-        # Информация
-        info_label = Label(
+        # Сборка карточки
+        card_container.add_widget(icon_container)
+        card_container.add_widget(title)
+        card_container.add_widget(subtitle)
+        card_container.add_widget(BoxLayout(size_hint_y=None, height=dp(28)))  # Отступ
+        card_container.add_widget(pin_label)
+        card_container.add_widget(self.pin_input)
+        card_container.add_widget(BoxLayout(size_hint_y=None, height=dp(20)))  # Отступ
+        card_container.add_widget(login_button)
+        
+        if bio_button:
+            card_container.add_widget(BoxLayout(size_hint_y=None, height=dp(16)))  # Отступ
+            card_container.add_widget(bio_button)
+        
+        main_container.add_widget(card_container)
+        
+        # Информация внизу
+        info_label = CaptionLabel(
             text='Для начала работы нажмите "Войти"',
             size_hint_y=None,
-            height=dp(30),
-            font_size=dp(12)
+            height=dp(24),
+            halign='center'
         )
-        layout.add_widget(info_label)
+        main_container.add_widget(info_label)
         
-        self.add_widget(layout)
+        self.add_widget(main_container)
+    
     
     def login(self, instance):
         """Вход в приложение"""

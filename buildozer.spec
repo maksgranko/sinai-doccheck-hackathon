@@ -22,10 +22,10 @@ source.include_exts = py,png,jpg,kv,atlas,json
 #source.exclude_exts = spec
 
 # (list) List of directory to exclude (let empty to not exclude anything)
-source.exclude_dirs = tests, bin, server, .buildozer
+#source.exclude_dirs = tests, bin
 
 # (list) List of exclusions using pattern matching
-source.exclude_patterns = mock_server.py,*.bat,Dockerfile*,*.md,STACK.txt,USAGE.md
+#source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
 version = 0.1
@@ -36,7 +36,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy==2.3.0,kivymd==1.2.0,requests==2.31.0,pyzbar==0.1.9,Pillow==8.4.0,cryptography==41.0.7,plyer==2.1.0,certifi==2023.11.17,urllib3==2.1.0,android
+requirements = python3,kivy==2.3.0,kivymd==1.2.0,requests==2.31.0,pyzbar==0.1.9,Pillow>=8.0.0,<10.0.0,cryptography==41.0.7,plyer==2.1.0,certifi==2023.11.17,urllib3==2.1.0,opencv-python==4.8.1.78,numpy==1.21.6,reportlab>=4.0.0,qrcode[pil]>=7.4.0,android
 
 # (str) Custom source folders for requirements
 #requirements.source.kivy = ../../kivy
@@ -93,7 +93,7 @@ android.minapi = 21
 
 # (str) The archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
 # In past, was `android.arch` as we weren't supporting builds for multiple archs at the same time.
-android.archs = arm64-v8a
+android.archs = armeabi-v7a, arm64-v8a
 
 # (bool) enables Android auto backup feature (Android API >=23)
 android.allow_backup = True
@@ -112,19 +112,20 @@ android.allow_backup = True
 p4a.fork = kivy
 
 # (str) python-for-android branch to use, defaults to master
-p4a.branch = develop
+p4a.branch = master
 
 # (str) python-for-android specific commit to use, defaults to HEAD, must be within p4a.branch
-#p4a.commit = HEAD
+p4a.commit = HEAD
 
 # (str) python-for-android git clone directory (if empty, it will be automatically cloned from github)
 #p4a.source_dir =
 
 # (str) The directory in which python-for-android should look for your own build recipes (if any)
-#p4a.local_recipes =
+# КРИТИЧНО: Используем кастомный рецепт cryptography
+p4a.local_recipes = p4a_recipes
 
 # (str) Filename to the hook for p4a
-#p4a.hook =
+p4a.hook = hooks/pre_build_cryptography.py
 
 # (str) Bootstrap to use for android builds
 # p4a.bootstrap = sdl2
@@ -252,10 +253,14 @@ macosx.simulator = False
 #
 
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
-log_level = 2
+log_level = 1
 
 # (int) Display warning if buildozer is run as root (0 = False, 1 = True)
-warn_on_root = 1
+warn_on_root = 0
+
+# Ускорение сборки
+android.ndk_api = 21
+android.skip_update = False
 
 # (str) Path to build artifact storage, absolute or relative to spec file
 # build_dir = ./.buildozer

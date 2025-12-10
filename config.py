@@ -3,18 +3,16 @@
 """
 import os
 
-# URL API сервера
-# Для использования mock сервера установите: API_BASE_URL = "http://localhost:8000"
-API_BASE_URL = os.getenv(
-    "API_BASE_URL",
-    "https://api.document-verifier.ru/v1"
-)
+# Базовый URL внешнего PHP API (без прямого доступа к БД)
+API_BASE_URL = os.getenv("API_BASE_URL", "http://195.209.210.97:7777/sinai.hackathon")
 
-# Использование mock сервера (для разработки)
-USE_MOCK_SERVER = os.getenv("USE_MOCK_SERVER", "false").lower() == "true"
+# Пути эндпоинтов
+API_VERIFY_PATH = os.getenv("API_VERIFY_PATH", "/api/verify.php")
+API_DOCUMENT_PATH = os.getenv("API_DOCUMENT_PATH", "/api/document.php")  # GET /?public_code=
 
-if USE_MOCK_SERVER:
-    API_BASE_URL = "http://localhost:8000/v1"
+# HTTP таймауты и ретраи
+HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", "10.0"))  # seconds
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 
 
 
