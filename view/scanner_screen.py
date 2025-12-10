@@ -100,7 +100,7 @@ class ScannerScreen(Screen):
         )
         
         # Заголовок - фиксированная высота
-        from design.components import TitleLabel, SecondaryButton
+        from design.components import TitleLabel, SecondaryButton, PrimaryButton
         
         header = BoxLayout(
             orientation='horizontal',
