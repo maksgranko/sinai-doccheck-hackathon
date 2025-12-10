@@ -15,6 +15,8 @@ try:
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -40,6 +42,9 @@ class PDFExportService:
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
+        self._font_registered = False
+        self._font_name = "Helvetica"
+        self._font_bold_name = "Helvetica-Bold"
     
     def export_verification_result(self, document, output_filename=None):
         """
@@ -63,6 +68,8 @@ class PDFExportService:
         output_path = self.output_dir / output_filename
         
         try:
+            self._ensure_font_registered()
+            
             doc = SimpleDocTemplate(
                 str(output_path),
                 pagesize=A4,
@@ -82,7 +89,8 @@ class PDFExportService:
                 fontSize=24,
                 textColor=colors.HexColor('#1E88E5'),
                 spaceAfter=30,
-                alignment=TA_CENTER
+                alignment=TA_CENTER,
+                fontName=self._font_bold_name
             )
             title = Paragraph("Результат верификации документа", title_style)
             story.append(title)
@@ -120,12 +128,14 @@ class PDFExportService:
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E88E5')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 0), (-1, 0), self._font_bold_name),
                 ('FONTSIZE', (0, 0), (-1, 0), 12),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+                ('FONTNAME', (0, 1), (-1, -1), self._font_name),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
             ]))
             
             story.append(table)
@@ -138,7 +148,8 @@ class PDFExportService:
                     parent=styles['Normal'],
                     fontSize=10,
                     textColor=colors.HexColor('#666666'),
-                    alignment=TA_LEFT
+                    alignment=TA_LEFT,
+                    fontName=self._font_name
                 )
                 meta_text = "Дополнительная информация:\n" + str(document.metadata)
                 meta_para = Paragraph(meta_text, meta_style)
@@ -188,4 +199,41 @@ class PDFExportService:
             'invalid': 'Недействителен'
         }
         return status_map.get(status, status)
+
+    def _ensure_font_registered(self):
+        """
+        Регистрирует шрифт с поддержкой кириллицы, если он ещё не зарегистрирован.
+        Пытаемся найти системные шрифты (Windows/Linux) или шрифт в проекте.
+        """
+        if not REPORTLAB_AVAILABLE:
+            return
+        if self._font_registered:
+            return
+        
+        candidate_paths = [
+            Path("fonts/DejaVuSans.ttf"),
+            Path("assets/fonts/DejaVuSans.ttf"),
+            Path("assets/fonts/DejaVuSansCondensed.ttf"),
+            Path("C:/Windows/Fonts/arial.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        ]
+        
+        for font_path in candidate_paths:
+            try:
+                if font_path.exists():
+                    pdfmetrics.registerFont(TTFont("DocSans", str(font_path)))
+                    self._font_name = "DocSans"
+                    # Для жирного используем тот же, если отдельного нет
+                    self._font_bold_name = "DocSans"
+                    self._font_registered = True
+                    Logger.info(f"PDFExport: Используется шрифт {font_path}")
+                    return
+            except Exception as e:
+                Logger.warning(f"PDFExport: не удалось зарегистрировать шрифт {font_path}: {e}")
+        
+        # Фолбек к стандартному Helvetica (может не отрисовать кириллицу, но хотя бы не упадём)
+        self._font_name = "Helvetica"
+        self._font_bold_name = "Helvetica-Bold"
+        self._font_registered = True
+        Logger.warning("PDFExport: не найден шрифт с кириллицей, используем Helvetica (могут быть квадраты)")
 

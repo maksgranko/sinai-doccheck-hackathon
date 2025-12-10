@@ -761,6 +761,7 @@ class ScannerScreen(Screen):
         
         try:
             from services.pdf_export import PDFExportService
+            from design.components import PrimaryButton
             export_service = PDFExportService()
             pdf_path = export_service.export_verification_result(self.last_verified_document)
             
